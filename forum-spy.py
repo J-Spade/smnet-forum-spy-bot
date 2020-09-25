@@ -102,7 +102,7 @@ def forum_spy_loop():
     '''
     prev_post_ids = []
     while True:
-        # Request the forum spy data and filter out posts (by ID) that were in the last pass we did
+        # Request the forum spy data
         spy_request = urllib.request.Request(FORUM_SPY_AJAX, headers=FORUM_SPY_REQUEST_HEADERS)
         with urllib.request.urlopen(spy_request) as f:
             data = json.load(f)
@@ -110,7 +110,7 @@ def forum_spy_loop():
         # The first time we query the spy, we just record what's there
         if len(prev_post_ids):
             for postdata in data:
-                # Post the new ones to discord
+                # If there are new posts in the spy, post them to discord
                 if postdata[0] not in prev_post_ids:
                     post = _parse_forum_post(postdata)
                     _post_in_discord(post)
