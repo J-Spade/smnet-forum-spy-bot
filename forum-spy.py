@@ -26,10 +26,28 @@ FORUM_SPY_REQUEST_HEADERS = {
 }
 FORUM_PREVIEW_LENGTH = 250
 
-
 # # # # #
 # Helper functions
 # # # # #
+
+def _get_username(user_profile):
+    '''
+    Requests the user profile and parses the name out of it.
+    We do this because users with avatars, which don't all have alt-text, and because the user
+    profile URL may have been adjusted from the actual username (e.g. "J_Spade" -> "J-Spade").
+    If the request fails, just default to the URL string.
+    '''
+    try:
+        profile_request = urllib.request.Request(user_profile, headers=FORUM_SPY_REQUEST_HEADERS)
+        with urllib.request.urlopen(profile_request) as f:
+            data = f.read()
+    except urllib.error.HTTPError as err:
+        print(f'While querying {user_profile}, {err.code}: {err.reason}')
+        return user_profile.split('/')[-1]
+
+    soup = BeautifulSoup(data, 'html.parser')
+    member = soup.find('a', {'class': 'member'})
+    return member.string
 
 def _parse_forum_post(data):
     '''
@@ -46,14 +64,17 @@ def _parse_forum_post(data):
     else:
         user_sprite = None
     member = header.h3.a
-    user_name = member['href'].split('/')[-1]  # no string for avatars
     user_profile = FORUM_ROOT + member['href']
+    if member.string:
+        user_name = member.string
+    else:
+        user_name = _get_username(user_profile)
 
     # Body: message content, signature
     body = soup.find('div', {'class': 'post-body'})
     content = body.find('div', {'class': 'message-content'})
     # TODO: handle things like quotes, spoilers, formatting
-    text = ''.join(content.strings)[:FORUM_PREVIEW_LENGTH]
+    text = ''.join(content.strings)[:FORUM_PREVIEW_LENGTH].strip()
 
     # Footer: date, thumb score, utils (quote, report, permalink)
     footer = soup.find('div', {'class': 'post-footer'})
@@ -81,16 +102,16 @@ def _post_in_discord(post):
     '''
     # See: https://discord.com/developers/docs/resources/channel#embed-object
     embed_data = {
-        'image': {
+        # Alternate forum post colors (even: 68375; odd:4648)
+        'color': (68375 if int(post['id'][-1]) % 2 == 0 else 4648),
+        'author': {
+            'name': post['user_name'],
+            'url': post['user_profile']
+        },
+        'thumbnail': {
             'url': post['user_sprite']
         },
-        'fields': [
-            {
-                'name': post['user_name'],
-                'value': post['text']
-            }
-        ],
-        'description': f"Permalink: {post['url']}"
+        'description': f"{post['text']}\n\n{post['url']}"
     }
 
     print(f"Posting {post['id']} to Discord")
