@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import discord
-import os
 import json
+import os
 import time
 import urllib.request
 
@@ -37,6 +37,7 @@ def _parse_forum_post(data):
     the Discord embed.
     '''
     soup = BeautifulSoup(data[1], 'html.parser') # format is [postID, html]
+    post_id = data[0]
 
     # Header: sprite, username, badges
     header = soup.find('div', {'class': 'post-header'})
@@ -63,6 +64,7 @@ def _parse_forum_post(data):
     url = FORUM_ROOT + permalink.a['href']
 
     post = {
+        'id': post_id,
         'user_sprite': user_sprite,
         'user_name': user_name,
         'user_profile': user_profile,
@@ -75,7 +77,9 @@ def _parse_forum_post(data):
 def _post_in_discord(post):
     '''
     Sends a webhook request to Discord, containing an embedded forum post.
+    If an error occurs, will retry up to a total of 5 attempts before giving up.
     '''
+    # See: https://discord.com/developers/docs/resources/channel#embed-object
     embed_data = {
         'image': {
             'url': post['user_sprite']
@@ -88,8 +92,16 @@ def _post_in_discord(post):
         ],
         'description': f"Permalink: {post['url']}"
     }
-    DISCORD_WEBHOOK.send(embed=discord.Embed.from_dict(embed_data))
 
+    print(f"Posting {post['id']} to Discord")
+    for attempt in range(5):
+        try:
+            DISCORD_WEBHOOK.send(embed=discord.Embed.from_dict(embed_data))
+            return
+        except discord.HTTPException as err:
+            print(f"{post['id']} attempt {attempt}, {err.status}: {err.text} (Discord code {err.code})")
+            time.sleep(5)
+    print(f"Failed to send {post['id']}")
 
 # # # # # 
 # Functionality
@@ -102,18 +114,21 @@ def forum_spy_loop():
     '''
     prev_post_ids = []
     while True:
-        # Request the forum spy data
-        spy_request = urllib.request.Request(FORUM_SPY_AJAX, headers=FORUM_SPY_REQUEST_HEADERS)
-        with urllib.request.urlopen(spy_request) as f:
-            data = json.load(f)
+        try:
+            # Request the forum spy data
+            spy_request = urllib.request.Request(FORUM_SPY_AJAX, headers=FORUM_SPY_REQUEST_HEADERS)
+            with urllib.request.urlopen(spy_request) as f:
+                data = json.load(f)
+        except urllib.error.HTTPError as err:
+            # If an HTTP error occurs, wait 30s and try again
+            print(f'While querying forum spy, {err.code}: {err.reason}')
+            time.sleep(30)
+            continue
 
-        # The first time we query the spy, we just record what's there
-        if len(prev_post_ids):
+        if len(prev_post_ids):  # The first time, just populate the list of posts in the spy
             for postdata in data:
-                # If there are new posts in the spy, post them to discord
                 if postdata[0] not in prev_post_ids:
-                    post = _parse_forum_post(postdata)
-                    _post_in_discord(post)
+                    _post_in_discord(_parse_forum_post(postdata))
                     time.sleep(1)
         prev_post_ids = [d[0] for d in data]
 
