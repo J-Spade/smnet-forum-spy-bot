@@ -128,7 +128,12 @@ def forum_spy_loop():
         if len(prev_post_ids):  # The first time, just populate the list of posts in the spy
             for postdata in data:
                 if postdata[0] not in prev_post_ids:
-                    _post_in_discord(_parse_forum_post(postdata))
+                    try:
+                        post = _parse_forum_post(postdata)
+                    except Exception as e:
+                        print(f"While parsing {postdata[0]}, encountered {str(e)}")
+                        continue
+                    _post_in_discord(post)
                     time.sleep(1)
         prev_post_ids = [d[0] for d in data]
 
