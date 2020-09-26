@@ -16,6 +16,7 @@ if not webhook_url:
     exit()
 
 DISCORD_WEBHOOK = discord.Webhook.from_url(webhook_url, adapter=discord.RequestsWebhookAdapter())
+DISCORD_NO_MENTIONS = discord.AllowedMentions(everyone=False, users=False, roles=False)
 
 FORUM_ROOT = 'https://forum.starmen.net'
 FORUM_SPY_AJAX = FORUM_ROOT + '/forum/spy.ajax'
@@ -25,6 +26,8 @@ FORUM_SPY_REQUEST_HEADERS = {
     'User-Agent': 'discord-forum-spy-bot',
 }
 FORUM_PREVIEW_LENGTH = 250
+FORUM_COLOR_EVEN = int(0x010b17)
+FORUM_COLOR_ODD = int(0x001228)
 
 # # # # #
 # Helper functions
@@ -102,8 +105,8 @@ def _post_in_discord(post):
     '''
     # See: https://discord.com/developers/docs/resources/channel#embed-object
     embed_data = {
-        # Alternate forum post colors (even: 68375; odd:4648)
-        'color': (68375 if int(post['id'][-1]) % 2 == 0 else 4648),
+        # Alternate forum post colors
+        'color': (FORUM_COLOR_EVEN if int(post['id'][-1]) % 2 == 0 else FORUM_COLOR_ODD),
         'author': {
             'name': post['user_name'],
             'url': post['user_profile']
@@ -117,7 +120,10 @@ def _post_in_discord(post):
     print(f"Posting {post['id']} to Discord")
     for attempt in range(5):
         try:
-            DISCORD_WEBHOOK.send(embed=discord.Embed.from_dict(embed_data))
+            DISCORD_WEBHOOK.send(
+                embed=discord.Embed.from_dict(embed_data),
+                allowed_mentions=DISCORD_NO_MENTIONS
+            )
             return
         except discord.HTTPException as err:
             print(f"{post['id']} attempt {attempt}, {err.status}: {err.text} (Discord code {err.code})")
