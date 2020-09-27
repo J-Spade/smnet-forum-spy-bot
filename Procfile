@@ -1,1 +1,1 @@
-worker: python3 forum-spy.py
+worker: python3 forum_spy.py
