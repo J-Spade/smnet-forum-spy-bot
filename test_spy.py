@@ -52,7 +52,7 @@ if __name__ == '__main__':
         help = 'One or more post IDs (int) to remove from the test AJAX data'
     )
     parser.add_argument(
-        '-t', '--test-data',
+        '-t', '--test',
         action = 'store_true',
         help = 'Test the parser against the data in the test set'
     )
@@ -92,9 +92,11 @@ if __name__ == '__main__':
             json.dump(test_data, f)
     
     # test the parser against the test data
-    for post_data in test_data:
-        post = forum_spy._parse_forum_post(post_data)
-        # post to discord if instructed
-        if args.post:
-            forum_spy._post_in_discord(post)
-            time.sleep(1)
+    if args.test:
+        for post_data in test_data:
+            post = forum_spy._parse_forum_post(post_data)
+            # post to discord if instructed
+            if args.post:
+                forum_spy._post_in_discord(post)
+                time.sleep(1)
+        print('done')

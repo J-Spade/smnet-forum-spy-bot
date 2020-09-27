@@ -75,7 +75,6 @@ def _parse_forum_post(data):
     # Footer: date, thumb score, utils (quote, report, permalink)
     footer = soup.find('div', {'class': 'post-footer'})
     post_date = footer.p.find('span', {'class': 'changeabletime'})['title']
-    
     utils = footer.find('ul', {'class': 'utils'})
     permalink = utils.find('li', {'class': 'permalink'})
     url = FORUM_ROOT + permalink.a['href']
