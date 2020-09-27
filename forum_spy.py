@@ -29,15 +29,14 @@ FORUM_PREVIEW_LENGTH = 250
 FORUM_COLOR_EVEN = int(0x010b17)
 FORUM_COLOR_ODD = int(0x001228)
 
+
 # # # # #
 # Helper functions
 # # # # #
 
 def _get_username(user_profile):
     '''
-    Requests the user profile and parses the name out of it.
-    We do this because users with avatars, which don't all have alt-text, and because the user
-    profile URL may have been adjusted from the actual username (e.g. "J_Spade" -> "J-Spade").
+    Requests the user profile and parses the name out of it (used for members with avatars).
     If the request fails, just default to the URL string.
     '''
     try:
@@ -73,12 +72,6 @@ def _parse_forum_post(data):
     else:
         user_name = _get_username(user_profile)
 
-    # Body: message content, signature
-    body = soup.find('div', {'class': 'post-body'})
-    content = body.find('div', {'class': 'message-content'})
-    # TODO: handle things like quotes, spoilers, formatting
-    text = ''.join(content.strings)[:FORUM_PREVIEW_LENGTH].strip()
-
     # Footer: date, thumb score, utils (quote, report, permalink)
     footer = soup.find('div', {'class': 'post-footer'})
     post_date = footer.p.find('span', {'class': 'changeabletime'})['title']
@@ -86,6 +79,36 @@ def _parse_forum_post(data):
     utils = footer.find('ul', {'class': 'utils'})
     permalink = utils.find('li', {'class': 'permalink'})
     url = FORUM_ROOT + permalink.a['href']
+
+    # Body: message content, signature
+    body = soup.find('div', {'class': 'post-body'})
+    content = body.find('div', {'class': 'message-content'})
+
+    # Handle blockquotes and spoiler blocks
+    # Currently, these are stripped from the preview, much like in the front page spy
+    blockquotes = content.find_all('blockquote')
+    for quote in blockquotes:
+        quote.clear()
+    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
+    for spoiler in block_spoilers:
+        spoiler.clear()
+
+    # Spoilerize inline spoilers
+    inline_spoilers = content.find_all('span', {'class': 'inline_spoiler'})
+    for spoiler in inline_spoilers:
+        # Drop the red spoiler title if there is one
+        if spoiler.span:
+            spoiler.span.clear()
+        new_spoiler = f'||{spoiler.get_text()}||'
+        spoiler.replace_with(new_spoiler)
+
+    # Trim the message text to a suitable preview length and strip extra whitespace.
+    text = content.get_text()[:FORUM_PREVIEW_LENGTH].strip()
+
+    # We may have just stripped away part of an inline spoiler, so fix that if needed
+    # (should be an even number of '||' delimiters)
+    if text.count('||') % 2 != 0:
+        text += '||'
 
     post = {
         'id': post_id,
@@ -130,6 +153,7 @@ def _post_in_discord(post):
             time.sleep(5)
     print(f"Failed to send {post['id']}")
 
+
 # # # # # 
 # Functionality
 # # # # #
@@ -166,7 +190,6 @@ def forum_spy_loop():
 
         # Wait a while before looking for new posts again
         time.sleep(15)
-
 
 if __name__ == '__main__':
     # usually we'd probably kick off a worker thread doing this, but we only really do one thing,
