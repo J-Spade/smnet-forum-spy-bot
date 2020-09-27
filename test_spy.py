@@ -7,8 +7,10 @@ import urllib.request
 
 import forum_spy
 
+
 # for now, not committed to the repo; generated and used locally only
 TEST_DATA_FILE = 'test_data.ajax'
+
 
 def get_forum_post_ajax(post_id):
     '''
@@ -64,9 +66,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--clear',
         action = 'store_true',
-        help = 'Remove all of the test data from the AJAX file'
+        help = 'Remove all of the test data from the AJAX file (can use --add-post to replace data)'
     )
     args = parser.parse_args()
+
+    # arg conflicts
+    if args.post and not args.test:
+        print('Warning: --test not specified; --post will be ignored!')
 
     # load the test data
     test_data = []
@@ -76,6 +82,8 @@ if __name__ == '__main__':
     
     # add/remove any specified test cases
     if args.add_post or args.delete_post or args.clear:
+        if args.clear:
+            test_data = []
         if args.add_post:
             for post_id in args.add_post:
                 test_data.append(get_forum_post_ajax(post_id))
@@ -84,9 +92,6 @@ if __name__ == '__main__':
             test_data = [
                 p for p in test_data if int(p[0][4:]) not in args.delete_post
             ]
-        if args.clear:
-            test_data = []
-
         # save the data back to the file
         with open(TEST_DATA_FILE, 'w') as f:
             json.dump(test_data, f)
@@ -99,4 +104,5 @@ if __name__ == '__main__':
             if args.post:
                 forum_spy._post_in_discord(post)
                 time.sleep(1)
-        print('done')
+    
+    print('done')
