@@ -12,7 +12,7 @@ import forum_spy
 TEST_DATA_FILE = 'test_data.ajax'
 
 
-def get_forum_post_ajax(post_id):
+def make_forum_post_ajax(post_id):
     '''
     Queries for a post with a given ID number (int) and generates the AJAX data for it,
     as if it were returned from the forum spy AJAX request.
@@ -86,7 +86,7 @@ if __name__ == '__main__':
             test_data = []
         if args.add_post:
             for post_id in args.add_post:
-                test_data.append(get_forum_post_ajax(post_id))
+                test_data.append(make_forum_post_ajax(post_id))
                 time.sleep(0.5)
         if args.delete_post:
             test_data = [
