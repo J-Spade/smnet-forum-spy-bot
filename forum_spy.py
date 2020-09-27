@@ -110,6 +110,9 @@ def _parse_forum_post(data):
     if text.count('||') % 2 != 0:
         text += '||'
 
+    if text == '':
+        text = '_[post contains only images, quotes and/or spoilers]_'
+
     post = {
         'id': post_id,
         'user_sprite': user_sprite,
