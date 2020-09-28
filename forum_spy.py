@@ -51,6 +51,38 @@ def _get_username(user_profile):
     member = soup.find('a', {'class': 'member'})
     return member.string
 
+def _convert_formatting(content):
+    # Handle blockquotes and spoiler blocks
+    if not hasattr(content, 'find_all'):
+        return content
+
+    # Blockquotes: recursively formats inner quote content the same way
+    blockquotes = content.find_all('blockquote', recursive=False)
+    for quote in blockquotes:
+        quote_by = quote.find('div', {'class': 'citey'})
+        quote_content = quote.find('div', {'class': 'quotey'})
+        # Recursively format inner quote text
+        # (base case is no quotes in which case this loop doesn't run)
+        _convert_formatting(quote_content)
+        markdown_quote = "\n".join(("> " + line) for line in quote_content.get_text().split("\n"))
+        if quote_by is not None:
+            markdown_quote = f'> *{quote_by.get_text()}*\n' + markdown_quote
+        quote.replace_with(markdown_quote)
+
+    # Block spoilers stripped from preview
+    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
+    for spoiler in block_spoilers:
+        spoiler.clear()
+
+    # Spoilerize inline spoilers
+    inline_spoilers = content.find_all('span', {'class': 'inline_spoiler'})
+    for spoiler in inline_spoilers:
+        # Drop the red spoiler title if there is one
+        if spoiler.span:
+            spoiler.span.clear()
+        new_spoiler = f'||{spoiler.get_text()}||'
+        spoiler.replace_with(new_spoiler)
+
 def _parse_forum_post(data):
     '''
     Pulls apart the AJAX data to find the bits of the forum post we want to display in
@@ -83,23 +115,7 @@ def _parse_forum_post(data):
     body = soup.find('div', {'class': 'post-body'})
     content = body.find('div', {'class': 'message-content'})
 
-    # Handle blockquotes and spoiler blocks
-    # Currently, these are stripped from the preview, much like in the front page spy
-    blockquotes = content.find_all('blockquote')
-    for quote in blockquotes:
-        quote.clear()
-    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
-    for spoiler in block_spoilers:
-        spoiler.clear()
-
-    # Spoilerize inline spoilers
-    inline_spoilers = content.find_all('span', {'class': 'inline_spoiler'})
-    for spoiler in inline_spoilers:
-        # Drop the red spoiler title if there is one
-        if spoiler.span:
-            spoiler.span.clear()
-        new_spoiler = f'||{spoiler.get_text()}||'
-        spoiler.replace_with(new_spoiler)
+    _convert_formatting(content)
 
     # Trim the message text to a suitable preview length and strip extra whitespace.
     text = content.get_text()[:FORUM_PREVIEW_LENGTH].strip()
