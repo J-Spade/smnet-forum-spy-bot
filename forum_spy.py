@@ -25,7 +25,7 @@ FORUM_SPY_REQUEST_HEADERS = {
     'Referer': 'https://forum.starmen.net/forum/spy',
     'User-Agent': 'discord-forum-spy-bot',
 }
-FORUM_PREVIEW_LENGTH = 250
+FORUM_PREVIEW_LENGTH = 500
 FORUM_COLOR_EVEN = int(0x010b17)
 FORUM_COLOR_ODD = int(0x001228)
 
@@ -58,7 +58,7 @@ def _get_username(user_profile):
     member = soup.find('a', {'class': 'member'})
     return member.string
 
-def _convert_formatting(content, max_length):
+def _convert_formatting(content, max_length, nesting):
     # Handle blockquotes and spoiler blocks
 
     # Blockquotes: recursively formats inner quote content the same way
@@ -100,7 +100,7 @@ def _convert_formatting(content, max_length):
             if remaining_length > MIN_QUOTE_LENGTH:
                 # Recursively format inner quote text
                 # (base case is no quotes in which case this loop doesn't run)
-                _convert_formatting(quote_content, remaining_length)
+                _convert_formatting(quote_content, remaining_length, nesting + 1)
                 markdown_quote = "\n".join(("> " + line) for line in quote_content.get_text().split("\n"))
             else:
                 markdown_quote = f'> {SNIP_TEXT}'
@@ -111,11 +111,13 @@ def _convert_formatting(content, max_length):
 
             # If multiple quotes next to each other, add a separating line
             next_elem = quote.find_next_sibling()
-            if next_elem and next_elem.name and next_elem.name == 'blockquote':
+            if nesting > 0 or next_elem and next_elem.name and next_elem.name == 'blockquote':
+                # we also add a separating line if nesting > 0 i.e. we're inside a nested quote,
+                # because discord doesn't actually support nested quotes so it can be hard to
+                # tell where a line ending with ">" ends and we aren't in the quote anymore
                 markdown_quote += "\n"
 
-            quote.clear()
-            quote.insert(0, markdown_quote)
+            quote.replace_with(markdown_quote)
 
     def rec_truncate(node, deficit):
         # Recursive function to truncate *non-quoted* text.
@@ -202,7 +204,7 @@ def _parse_forum_post(data):
     body = soup.find('div', {'class': 'post-body'})
     content = body.find('div', {'class': 'message-content'})
 
-    _convert_formatting(content, FORUM_PREVIEW_LENGTH)
+    _convert_formatting(content, FORUM_PREVIEW_LENGTH, 0)
 
     # Convert to plaintext and strip extra whitespace.
     text = content.get_text().strip()
