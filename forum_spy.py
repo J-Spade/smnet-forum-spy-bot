@@ -25,7 +25,7 @@ FORUM_SPY_REQUEST_HEADERS = {
     'Referer': 'https://forum.starmen.net/forum/spy',
     'User-Agent': 'discord-forum-spy-bot',
 }
-FORUM_PREVIEW_LENGTH = 500
+FORUM_PREVIEW_LENGTH = 250
 FORUM_COLOR_EVEN = int(0x010b17)
 FORUM_COLOR_ODD = int(0x001228)
 
