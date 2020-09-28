@@ -81,7 +81,7 @@ def _convert_formatting(content, max_length, nesting):
                 if child.string != "\n":
                     text_length += len(child.string)
             # Skip children that are block spoilers
-            elif "spoiler_container" in child["class"]:
+            elif child.has_attr("class") and "spoiler_container" in child["class"]:
                 continue
             # Add non-string children's length recursively
             elif child is not node:
