@@ -80,6 +80,9 @@ def _convert_formatting(content, max_length, nesting):
             elif child.string:
                 if child.string != "\n":
                     text_length += len(child.string)
+            # Skip children that are block spoilers
+            elif "spoiler_container" in child["class"]:
+                continue
             # Add non-string children's length recursively
             elif child is not node:
                 text_length += rec_textlength(child)
@@ -119,6 +122,11 @@ def _convert_formatting(content, max_length, nesting):
 
             quote.replace_with(markdown_quote)
 
+    # Block spoilers stripped from preview
+    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
+    for spoiler in block_spoilers:
+        spoiler.clear()
+
     def rec_truncate(node, deficit):
         # Recursive function to truncate *non-quoted* text.
         # 'deficit' is how much we have to cut off. But we
@@ -157,11 +165,6 @@ def _convert_formatting(content, max_length, nesting):
 
     if text_length > max_length:
         rec_truncate(content, text_length - max_length)
-
-    # Block spoilers stripped from preview
-    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
-    for spoiler in block_spoilers:
-        spoiler.clear()
 
     # Spoilerize inline spoilers
     inline_spoilers = content.find_all('span', {'class': 'inline_spoiler'})
