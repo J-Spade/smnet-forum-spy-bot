@@ -58,7 +58,7 @@ def _get_username(user_profile):
     member = soup.find('a', {'class': 'member'})
     return member.string
 
-def _convert_formatting(content, max_length, nesting):
+def _format_quotes(content, max_length, nesting):
     # Handle blockquotes and spoiler blocks
 
     # Blockquotes: recursively formats inner quote content the same way
@@ -103,7 +103,7 @@ def _convert_formatting(content, max_length, nesting):
             if remaining_length > MIN_QUOTE_LENGTH:
                 # Recursively format inner quote text
                 # (base case is no quotes in which case this loop doesn't run)
-                _convert_formatting(quote_content, remaining_length, nesting + 1)
+                _format_quotes(quote_content, remaining_length, nesting + 1)
                 markdown_quote = "\n".join(("> " + line) for line in quote_content.get_text().split("\n"))
             else:
                 markdown_quote = f'> {SNIP_TEXT}'
@@ -163,6 +163,9 @@ def _convert_formatting(content, max_length, nesting):
 
     if text_length > max_length:
         rec_truncate(content, text_length - max_length)
+
+def _convert_formatting(content):
+    _format_quotes(content, FORUM_PREVIEW_LENGTH, 0)
 
     # Block spoilers replaced with title
     block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
@@ -229,7 +232,7 @@ def _parse_forum_post(data):
     body = soup.find('div', {'class': 'post-body'})
     content = body.find('div', {'class': 'message-content'})
 
-    _convert_formatting(content, FORUM_PREVIEW_LENGTH, 0)
+    _convert_formatting(content)
 
     # Convert to plaintext and strip extra whitespace.
     text = content.get_text().strip()
