@@ -181,6 +181,22 @@ def _convert_formatting(content, max_length, nesting):
         new_spoiler = f'||{spoiler.get_text()}||'
         spoiler.replace_with(new_spoiler)
 
+    # Basic formatting
+    bolds = content.find_all('strong')
+    for bold in bolds:
+        if bold.get_text():
+            bold.replace_with(f'**{bold.get_text()}**')
+
+    italics = content.find_all('em')
+    for italic in italics:
+        if italic.get_text():
+            italic.replace_with(f'*{italic.get_text()}*')
+
+    strikethroughs = content.find_all('del')
+    for strikethrough in strikethroughs:
+        if strikethrough.get_text():
+            strikethrough.replace_with(f'~~{strikethrough.get_text()}~~')
+
 def _parse_forum_post(data):
     '''
     Pulls apart the AJAX data to find the bits of the forum post we want to display in
