@@ -72,7 +72,7 @@ def _convert_formatting(content, max_length, nesting):
     # Determine how much non-quote text is here
     def rec_textlength(node):
         text_length = 0
-        for child in node.children:
+        for child in node.childGenerator():
             # Skip children that are blockquotes
             if child.name and child.name == 'blockquote':
                 continue
@@ -122,11 +122,6 @@ def _convert_formatting(content, max_length, nesting):
 
             quote.replace_with(markdown_quote)
 
-    # Block spoilers stripped from preview
-    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
-    for spoiler in block_spoilers:
-        spoiler.clear()
-
     def rec_truncate(node, deficit):
         # Recursive function to truncate *non-quoted* text.
         # 'deficit' is how much we have to cut off. But we
@@ -137,7 +132,7 @@ def _convert_formatting(content, max_length, nesting):
 
         # We iterate over the children of the node in reverse
         # so we start cutting from the end
-        for child in reversed(list(node.children)):
+        for child in reversed(list(node.childGenerator())):
             if child.name and child.name == 'blockquote':
                 # Since we still have a deficit (i.e. we're still
                 # looping, so we still want to be cutting stuff off
@@ -156,6 +151,9 @@ def _convert_formatting(content, max_length, nesting):
                     child.string.replace_with(child.string[:-deficit] + TRUNCATE_TEXT)
                     deficit = 0
                     break
+            elif child.has_attr("class") and "spoiler_container" in child["class"]:
+                # Strip block spoilers for same reason as blockquotes
+                child.clear()
             else:
                 # It's some kind of weird compound tag
                 deficit = rec_truncate(child, deficit)
@@ -165,6 +163,14 @@ def _convert_formatting(content, max_length, nesting):
 
     if text_length > max_length:
         rec_truncate(content, text_length - max_length)
+
+    # Block spoilers replaced with title
+    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
+    for spoiler in block_spoilers:
+        if spoiler.find('button', {'class': 'spoileron'}):
+            # if it wasn't stripped out during the truncation process...
+            spoilertitle = spoiler.find('button', {'class': 'spoileron'}).get_text()
+            spoiler.replace_with(f"**[{spoilertitle}]**\n")
 
     # Spoilerize inline spoilers
     inline_spoilers = content.find_all('span', {'class': 'inline_spoiler'})
