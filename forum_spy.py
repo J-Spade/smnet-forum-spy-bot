@@ -58,7 +58,7 @@ def _get_username(user_profile):
     member = soup.find('a', {'class': 'member'})
     return member.string
 
-def _convert_formatting(content, max_length, nesting):
+def _format_quotes(content, max_length, nesting):
     # Handle blockquotes and spoiler blocks
 
     # Blockquotes: recursively formats inner quote content the same way
@@ -72,7 +72,7 @@ def _convert_formatting(content, max_length, nesting):
     # Determine how much non-quote text is here
     def rec_textlength(node):
         text_length = 0
-        for child in node.children:
+        for child in node.childGenerator():
             # Skip children that are blockquotes
             if child.name and child.name == 'blockquote':
                 continue
@@ -103,7 +103,7 @@ def _convert_formatting(content, max_length, nesting):
             if remaining_length > MIN_QUOTE_LENGTH:
                 # Recursively format inner quote text
                 # (base case is no quotes in which case this loop doesn't run)
-                _convert_formatting(quote_content, remaining_length, nesting + 1)
+                _format_quotes(quote_content, remaining_length, nesting + 1)
                 markdown_quote = "\n".join(("> " + line) for line in quote_content.get_text().split("\n"))
             else:
                 markdown_quote = f'> {SNIP_TEXT}'
@@ -122,11 +122,6 @@ def _convert_formatting(content, max_length, nesting):
 
             quote.replace_with(markdown_quote)
 
-    # Block spoilers stripped from preview
-    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
-    for spoiler in block_spoilers:
-        spoiler.clear()
-
     def rec_truncate(node, deficit):
         # Recursive function to truncate *non-quoted* text.
         # 'deficit' is how much we have to cut off. But we
@@ -137,7 +132,7 @@ def _convert_formatting(content, max_length, nesting):
 
         # We iterate over the children of the node in reverse
         # so we start cutting from the end
-        for child in reversed(list(node.children)):
+        for child in reversed(list(node.childGenerator())):
             if child.name and child.name == 'blockquote':
                 # Since we still have a deficit (i.e. we're still
                 # looping, so we still want to be cutting stuff off
@@ -156,6 +151,9 @@ def _convert_formatting(content, max_length, nesting):
                     child.string.replace_with(child.string[:-deficit] + TRUNCATE_TEXT)
                     deficit = 0
                     break
+            elif child.has_attr("class") and "spoiler_container" in child["class"]:
+                # Strip block spoilers for same reason as blockquotes
+                child.clear()
             else:
                 # It's some kind of weird compound tag
                 deficit = rec_truncate(child, deficit)
@@ -166,6 +164,17 @@ def _convert_formatting(content, max_length, nesting):
     if text_length > max_length:
         rec_truncate(content, text_length - max_length)
 
+def _convert_formatting(content):
+    _format_quotes(content, FORUM_PREVIEW_LENGTH, 0)
+
+    # Block spoilers replaced with title
+    block_spoilers = content.find_all('div', {'class': 'spoiler_container'})
+    for spoiler in block_spoilers:
+        if spoiler.find('button', {'class': 'spoileron'}):
+            # if it wasn't stripped out during the truncation process...
+            spoilertitle = spoiler.find('button', {'class': 'spoileron'}).get_text()
+            spoiler.replace_with(f"**[{spoilertitle}]**\n")
+
     # Spoilerize inline spoilers
     inline_spoilers = content.find_all('span', {'class': 'inline_spoiler'})
     for spoiler in inline_spoilers:
@@ -174,6 +183,22 @@ def _convert_formatting(content, max_length, nesting):
             spoiler.span.clear()
         new_spoiler = f'||{spoiler.get_text()}||'
         spoiler.replace_with(new_spoiler)
+
+    # Basic formatting
+    bolds = content.find_all('strong')
+    for bold in bolds:
+        if bold.get_text():
+            bold.replace_with(f'**{bold.get_text()}**')
+
+    italics = content.find_all('em')
+    for italic in italics:
+        if italic.get_text():
+            italic.replace_with(f'*{italic.get_text()}*')
+
+    strikethroughs = content.find_all('del')
+    for strikethrough in strikethroughs:
+        if strikethrough.get_text():
+            strikethrough.replace_with(f'~~{strikethrough.get_text()}~~')
 
 def _parse_forum_post(data):
     '''
@@ -207,7 +232,7 @@ def _parse_forum_post(data):
     body = soup.find('div', {'class': 'post-body'})
     content = body.find('div', {'class': 'message-content'})
 
-    _convert_formatting(content, FORUM_PREVIEW_LENGTH, 0)
+    _convert_formatting(content)
 
     # Convert to plaintext and strip extra whitespace.
     text = content.get_text().strip()
