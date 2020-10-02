@@ -298,7 +298,7 @@ def forum_spy_loop():
     The main loop. Retrieves new forum posts every 15 seconds (same as forum spy).
     If there are any new posts, has them posted to the Discord channel.
     '''
-    prev_post_ids = []
+    newest_post_id = 0
     while True:
         try:
             # Request the forum spy data
@@ -311,18 +311,24 @@ def forum_spy_loop():
             time.sleep(30)
             continue
 
-        if len(prev_post_ids):  # The first time, just populate the list of posts in the spy
+        # The first time through the loop, just get the newest post ID
+        # (AJAX data is ordered oldest to newest)
+        if not newest_post_id:
+            newest_post_id = int(data[-1][0][4:])
+        else:
             for postdata in data:
-                if postdata[0] not in prev_post_ids:
+                # Post anything newer than the last thing we posted
+                post_id = int(postdata[0][4:])
+                if post_id > newest_post_id:
                     try:
                         post = _parse_forum_post(postdata)
                     except Exception as e:
                         print(f"While parsing {postdata[0]}, encountered {str(e)}")
                         continue
                     _post_in_discord(post)
+                    newest_post_id = post_id
                     time.sleep(1)
-        prev_post_ids = [d[0] for d in data]
-
+        
         # Wait a while before looking for new posts again
         time.sleep(15)
 
