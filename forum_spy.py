@@ -29,6 +29,11 @@ FORUM_PREVIEW_LENGTH = 250
 FORUM_COLOR_EVEN = int(0x010b17)
 FORUM_COLOR_ODD = int(0x001228)
 
+EXCLUDED_BOARDS = [
+    '/forum/Community/mafia',
+    '/forum/Community/mafiB',
+]
+
 # What to display when we can't fit a quote?
 SNIP_TEXT = "*[...]*"
 # What to display when we cut off some text?
@@ -288,6 +293,15 @@ def _post_in_discord(post):
             time.sleep(5)
     print(f"Failed to send {post['id']}")
 
+def is_board_excluded(url):
+    '''
+    Check whether a post belongs to a board we want to exclude from the forum spy, e.g. mafia boards
+    '''
+    for board in EXCLUDED_BOARDS:
+        if board.lower() in url.lower():
+            return True
+    return False
+
 
 # # # # # 
 # Functionality
@@ -325,9 +339,10 @@ def forum_spy_loop():
                     except Exception as e:
                         print(f"While parsing {postdata[0]}, encountered {str(e)}")
                         continue
-                    _post_in_discord(post)
+                    if not is_board_excluded(post['url']):
+                        _post_in_discord(post)
+                        time.sleep(1)
                     newest_post_id = post_id
-                    time.sleep(1)
         
         # Wait a while before looking for new posts again
         time.sleep(15)
