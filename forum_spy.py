@@ -333,7 +333,10 @@ def forum_spy_loop():
         # The first time through the loop, just get the newest post ID
         # (AJAX data is ordered oldest to newest)
         if not newest_post_id:
-            newest_post_id = int(data[-1][0][4:])
+            try:
+                newest_post_id = int(data[-1][0][4:])
+            except IndexError:
+                print("No post data returned by forum spy!")
         else:
             for postdata in data:
                 # Post anything newer than the last thing we posted
