@@ -329,6 +329,11 @@ def forum_spy_loop():
             print(f"While querying forum spy, {err.code}: {err.reason}")
             time.sleep(30)
             continue
+        except json.decoder.JSONDecodeError as err:
+            # If a JSON decode error happens, wait 30s and try again?
+            print(f"Empty or malformed JSON returned by forum spy!")
+            time.sleep(30)
+            continue
 
         # The first time through the loop, just get the newest post ID
         # (AJAX data is ordered oldest to newest)
