@@ -195,6 +195,19 @@ def _convert_formatting(content):
         new_spoiler = f"||{spoiler.get_text()}||"
         spoiler.replace_with(new_spoiler)
 
+    # Render polls (only one possible per post)
+    poll = content.find("div", {"class": "poll"})
+    if poll:
+        poll_title = poll.find("div", {"class": "poll-header"}).h3.get_text()
+        # no point rendering the vote count, as we'll usually just see zero
+        option_lis = poll.find("form", {"class": "poll-body"}).ol.find_all("li")
+        options = [""] + [li.label.get_text() for li in option_lis]
+        poll.replace_with(
+            f"**{poll_title}**"
+            + "\n> □ ".join(options)
+            + "\n"
+        )
+
     # Basic formatting
     bolds = content.find_all("strong")
     for bold in bolds:
