@@ -16,12 +16,22 @@ import discord
 # Config variables
 # # # # #
 
-webhook_url = os.getenv("FORUM_SPY_DISCORD_WEBHOOK_URL")
-if not webhook_url:
+webhook_url_general = os.getenv("FORUM_SPY_DISCORD_WEBHOOK_URL")
+if not webhook_url_general:
     print("ERROR: Environment variable FORUM_SPY_DISCORD_WEBHOOK_URL must be set!")
     sys.exit()
 
-DISCORD_WEBHOOK = discord.Webhook.from_url(webhook_url, adapter=discord.RequestsWebhookAdapter())
+webhook_url_mafia = os.getenv("FORUM_SPY_DISCORD_WEBHOOK_URL_MAFIA")
+if not webhook_url_mafia:
+    print("ERROR: Environment variable FORUM_SPY_DISCORD_WEBHOOK_URL_MAFIA must be set!")
+    sys.exit()
+
+DISCORD_WEBHOOK_GENERAL = discord.Webhook.from_url(
+    webhook_url_general, adapter=discord.RequestsWebhookAdapter()
+)
+DISCORD_WEBHOOK_MAFIA = discord.Webhook.from_url(
+    webhook_url_mafia, adapter=discord.RequestsWebhookAdapter()
+)
 DISCORD_NO_MENTIONS = discord.AllowedMentions(everyone=False, users=False, roles=False)
 
 FORUM_ROOT = "https://forum.starmen.net"
@@ -35,7 +45,9 @@ FORUM_PREVIEW_LENGTH = 250
 FORUM_COLOR_EVEN = int(0x010B17)
 FORUM_COLOR_ODD = int(0x001228)
 
-EXCLUDED_BOARDS = [
+EXCLUDED_BOARDS = []
+
+MAFIA_BOARDS = [
     "/forum/Community/mafia",
     "/forum/Community/mafiB",
 ]
@@ -202,11 +214,7 @@ def _convert_formatting(content):
         # no point rendering the vote count, as we'll usually just see zero
         option_lis = poll.find("form", {"class": "poll-body"}).ol.find_all("li")
         options = [""] + [li.label.get_text() for li in option_lis]
-        poll.replace_with(
-            f"**{poll_title}**"
-            + "\n> □ ".join(options)
-            + "\n"
-        )
+        poll.replace_with(f"**{poll_title}**" + "\n> □ ".join(options) + "\n")
 
     # Basic formatting
     bolds = content.find_all("strong")
@@ -288,6 +296,18 @@ def _post_in_discord(post):
     If an error occurs, will retry up to a total of 5 attempts before giving up.
     """
     # See: https://discord.com/developers/docs/resources/channel#embed-object
+
+    if post["url"] in EXCLUDED_BOARDS:
+        print(f"Not posting {post['url']} from excluded board")
+        return
+
+    # If this mapping logic ever becomes more complicated we'll want some sort of dict lookup
+    webhook = (
+        DISCORD_WEBHOOK_MAFIA
+        if any([board.lower() in post["url"].lower() for board in MAFIA_BOARDS])
+        else DISCORD_WEBHOOK_GENERAL
+    )
+
     embed_data = {
         # Alternate forum post colors
         "color": (FORUM_COLOR_EVEN if int(post["id"][-1]) % 2 == 0 else FORUM_COLOR_ODD),
@@ -296,10 +316,10 @@ def _post_in_discord(post):
         "description": f"{post['text']}\n\n{post['url']}",
     }
 
-    print(f"Posting {post['id']} to Discord")
+    print(f"Posting {post['id']} to {webhook}")
     for _ in range(5):
         try:
-            DISCORD_WEBHOOK.send(
+            webhook.send(
                 embed=discord.Embed.from_dict(embed_data),
                 allowed_mentions=DISCORD_NO_MENTIONS,
             )
@@ -308,16 +328,6 @@ def _post_in_discord(post):
             print(f"{post['id']}, {err.status}: {err.text} (Discord code {err.code})")
             time.sleep(5)
     print(f"Failed to send {post['id']}")
-
-
-def is_board_excluded(url):
-    """
-    Check whether a post belongs to a board we want to exclude from the forum spy
-    """
-    for board in EXCLUDED_BOARDS:
-        if board.lower() in url.lower():
-            return True
-    return False
 
 
 # # # # #
@@ -344,7 +354,7 @@ def forum_spy_loop():
             continue
         except json.decoder.JSONDecodeError as err:
             # If a JSON decode error happens, wait 30s and try again?
-            print(f"Empty or malformed JSON returned by forum spy!")
+            print("Empty or malformed JSON returned by forum spy!")
             time.sleep(30)
             continue
 
@@ -365,10 +375,9 @@ def forum_spy_loop():
                     except Exception as err:  # pylint:disable=broad-except
                         print(f"While parsing {postdata[0]}, encountered {str(err)}")
                         continue
-                    if not is_board_excluded(post["url"]):
-                        _post_in_discord(post)
-                        time.sleep(1)
+                    _post_in_discord(post)
                     newest_post_id = post_id
+                    time.sleep(1)
 
         # Wait a while before looking for new posts again
         time.sleep(15)
