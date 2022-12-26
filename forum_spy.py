@@ -45,7 +45,10 @@ FORUM_PREVIEW_LENGTH = 250
 FORUM_COLOR_EVEN = int(0x010B17)
 FORUM_COLOR_ODD = int(0x001228)
 
-EXCLUDED_BOARDS = []
+EXCLUDED_BOARDS = [
+    "/forum/Wacky",
+    "/forum/Storage",
+]
 
 MAFIA_BOARDS = [
     "/forum/Community/mafia",
@@ -297,14 +300,16 @@ def _post_in_discord(post):
     """
     # See: https://discord.com/developers/docs/resources/channel#embed-object
 
-    if post["url"] in EXCLUDED_BOARDS:
-        print(f"Not posting {post['url']} from excluded board")
+    # Drop posts from excluded boards/subforums
+    if any([board in post["url"] for board in EXCLUDED_BOARDS]):
+        print(f"Not posting {post['url']} (excluded board)")
         return
 
+    # Map mafia posts to the correct webhook
     # If this mapping logic ever becomes more complicated we'll want some sort of dict lookup
     webhook = (
         DISCORD_WEBHOOK_MAFIA
-        if any([board.lower() in post["url"].lower() for board in MAFIA_BOARDS])
+        if any([board in post["url"] for board in MAFIA_BOARDS])
         else DISCORD_WEBHOOK_GENERAL
     )
 
