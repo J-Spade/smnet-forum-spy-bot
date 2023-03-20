@@ -48,7 +48,6 @@ FORUM_COLOR_ODD = int(0x001228)
 EXCLUDED_BOARDS = [
     "/forum/Wacky",
     "/forum/Storage",
-    "/forum/CurrentEvent/m317",  # temporary
 ]
 
 MAFIA_BOARDS = [
