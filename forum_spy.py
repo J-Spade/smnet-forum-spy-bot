@@ -86,7 +86,7 @@ def _get_username(user_profile):
     return member.string
 
 
-def _format_quotes(content, max_length, nesting):
+def _format_quotes_and_spoilers(content, max_length, nesting):
     """
     Handle blockquotes and spoiler blocks. Recursively formats inner quote content the same way.
 
@@ -116,6 +116,14 @@ def _format_quotes(content, max_length, nesting):
 
     text_length = rec_textlength(content)
 
+    # Block spoilers replaced with title
+    block_spoilers = content.find_all("div", {"class": "spoiler_container"})
+    for spoiler in block_spoilers:
+        if spoiler.find("button", {"class": "spoileron"}):
+            # if it wasn't stripped out during the truncation process...
+            spoilertitle = spoiler.find("button", {"class": "spoileron"}).get_text()
+            spoiler.replace_with(f"**[{spoilertitle}]**\n")
+
     # If we have any blockquotes, we want to format/truncate them recursively
     blockquotes = content.find_all("blockquote", recursive=False)
 
@@ -129,7 +137,7 @@ def _format_quotes(content, max_length, nesting):
             if remaining_length > MIN_QUOTE_LENGTH:
                 # Recursively format inner quote text
                 # (base case is no quotes in which case this loop doesn't run)
-                _format_quotes(quote_content, remaining_length, nesting + 1)
+                _format_quotes_and_spoilers(quote_content, remaining_length, nesting + 1)
                 markdown_quote = "\n".join(
                     ("> " + line) for line in quote_content.get_text().split("\n")
                 )
@@ -191,15 +199,7 @@ def _format_quotes(content, max_length, nesting):
 
 
 def _convert_formatting(content):
-    _format_quotes(content, FORUM_PREVIEW_LENGTH, 0)
-
-    # Block spoilers replaced with title
-    block_spoilers = content.find_all("div", {"class": "spoiler_container"})
-    for spoiler in block_spoilers:
-        if spoiler.find("button", {"class": "spoileron"}):
-            # if it wasn't stripped out during the truncation process...
-            spoilertitle = spoiler.find("button", {"class": "spoileron"}).get_text()
-            spoiler.replace_with(f"**[{spoilertitle}]**\n")
+    _format_quotes_and_spoilers(content, FORUM_PREVIEW_LENGTH, 0)
 
     # Spoilerize inline spoilers
     inline_spoilers = content.find_all("span", {"class": "inline_spoiler"})
