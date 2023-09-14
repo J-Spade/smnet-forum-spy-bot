@@ -279,7 +279,7 @@ def _parse_forum_post(data):  # pylint:disable=too-many-locals
         text += "||"
 
     if text == "":
-        text = "_[post contains only images, quotes and/or spoilers]_"
+        text = "_[post contains only images]_"
 
     post = {
         "id": post_id,
